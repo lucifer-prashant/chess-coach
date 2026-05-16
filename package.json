@@ -1,0 +1,36 @@
+{
+  "name": "chess-coach",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "copy-sf": "mkdir -p public/sf && cp node_modules/stockfish/bin/stockfish-18.js node_modules/stockfish/bin/stockfish-18.wasm node_modules/stockfish/bin/stockfish-18-single.js node_modules/stockfish/bin/stockfish-18-single.wasm public/sf/",
+    "copy-cg": "mkdir -p public/cg && cp node_modules/chessground/assets/chessground.base.css node_modules/chessground/assets/chessground.brown.css node_modules/chessground/assets/chessground.cburnett.css public/cg/",
+    "predev": "pnpm copy-sf && pnpm copy-cg",
+    "prebuild": "pnpm copy-sf && pnpm copy-cg",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "15.0.3",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "chess.js": "1.0.0-beta.8",
+    "chessground": "9.1.1",
+    "stockfish": "18.0.7",
+    "firebase": "11.0.2",
+    "zustand": "5.0.1",
+    "clsx": "2.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.9.0",
+    "@types/react": "19.0.0",
+    "@types/react-dom": "19.0.0",
+    "typescript": "5.6.3",
+    "tailwindcss": "3.4.14",
+    "postcss": "8.4.49",
+    "autoprefixer": "10.4.20"
+  }
+}

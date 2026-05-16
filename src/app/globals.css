@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(124, 92, 255, 0.08), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(54, 197, 214, 0.06), transparent 60%),
+    #0b0d12;
+  color: #e6e8ef;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ----------- Chessground sizing ------------ */
+.cg-wrap {
+  box-sizing: content-box;
+  position: relative;
+  display: block;
+}
+
+/* Keep brown.css chequer; tint highlights to accent. */
+.cg-wrap cg-board square.last-move { background-color: rgba(124, 92, 255, 0.42) !important; }
+.cg-wrap cg-board square.selected { background-color: rgba(124, 92, 255, 0.55) !important; }
+.cg-wrap cg-board square.check {
+  background: radial-gradient(ellipse at center, rgba(232,85,59,0.85) 0%, rgba(232,85,59,0.4) 35%, rgba(232,85,59,0) 70%) !important;
+}
+
+/* Hint arrows already use built-in green/yellow/red brushes via setAutoShapes. */
+
+/* ----------- Misc UI ------------ */
+* { -webkit-tap-highlight-color: transparent; }
+
+.glass {
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(6px);
+}
+
+.card {
+  background: linear-gradient(180deg, #161922 0%, #14171f 100%);
+  border: 1px solid #252a3a;
+  border-radius: 14px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1rem;
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: transform 0.05s ease, background 0.15s, border-color 0.15s, opacity 0.15s;
+  border: 1px solid #252a3a;
+  background: #161922;
+  color: #e6e8ef;
+}
+.btn:hover { background: #1c2030; }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary {
+  background: linear-gradient(180deg, #8a6bff 0%, #6a4cff 100%);
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 6px 18px -8px rgba(124,92,255,0.6);
+}
+.btn-primary:hover { background: linear-gradient(180deg, #9479ff 0%, #7558ff 100%); }
+.btn-danger {
+  background: linear-gradient(180deg, #f47057 0%, #d8462b 100%);
+  border-color: transparent;
+  color: white;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+/* subtle scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #2a2f42; border-radius: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, #1c2030 25%, #252a3a 50%, #1c2030 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite linear;
+}

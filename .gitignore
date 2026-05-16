@@ -1,0 +1,21 @@
+node_modules
+.next
+out
+.DS_Store
+*.log
+.env
+.env.local
+.env*.local
+.vercel
+next-env.d.ts
+
+# generated assets copied into public/ during install/build
+public/sf
+public/cg
+
+# editor
+.idea
+.vscode
+
+# misc
+*.tsbuildinfo

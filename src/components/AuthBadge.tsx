@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { signInGoogle, signOutCurrent, watchAuth, consumeRedirect } from '@/lib/firebase';
+import { signInGoogle, signOutCurrent, watchAuth } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
 
 export default function AuthBadge() {
@@ -16,14 +16,6 @@ export default function AuthBadge() {
       setConfigured(false);
       return;
     }
-    consumeRedirect()
-      .then((redirectUser) => {
-        if (redirectUser) setUser(redirectUser);
-      })
-      .catch((err) => {
-        console.error(err);
-        setError(formatAuthError(err));
-      });
     const off = watchAuth(setUser);
     return () => off();
   }, []);
@@ -75,6 +67,8 @@ function formatAuthError(err: unknown): string {
   const message = (err as { message?: string }).message;
   if (code === 'auth/popup-closed-by-user') return 'Google sign-in popup closed before Firebase finished.';
   if (code === 'auth/unauthorized-domain') return 'This domain is not authorized in Firebase Auth.';
+  if (code === 'auth/popup-blocked') return 'Browser blocked the sign-in popup.';
+  if (code === 'auth/popup-timeout') return 'Sign-in timed out.';
   if (code) return code;
   return message ?? 'Sign-in failed';
 }

@@ -2,7 +2,7 @@
 
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import {
-  getAuth, GoogleAuthProvider, getRedirectResult, signInWithPopup, signOut,
+  getAuth, GoogleAuthProvider, signInWithPopup, signOut,
   onAuthStateChanged, type Auth, type User,
 } from 'firebase/auth';
 import {
@@ -49,14 +49,17 @@ export function fbDb(): Firestore | null {
 export async function signInGoogle(): Promise<void> {
   const a = fbAuth();
   if (!a) throw new Error('Firebase not configured. Add NEXT_PUBLIC_FIREBASE_* env vars.');
-  await signInWithPopup(a, new GoogleAuthProvider());
+  if (typeof window !== 'undefined' && window.crossOriginIsolated) {
+    await signInGoogleViaBridge(a);
+    return;
+  }
+  await signInGooglePopup(a);
 }
 
-export async function consumeRedirect(): Promise<User | null> {
-  const a = fbAuth();
-  if (!a) return null;
-  const result = await getRedirectResult(a);
-  return result?.user ?? null;
+export async function signInGooglePopup(a?: Auth): Promise<void> {
+  const auth = a ?? fbAuth();
+  if (!auth) throw new Error('Firebase not configured. Add NEXT_PUBLIC_FIREBASE_* env vars.');
+  await signInWithPopup(auth, new GoogleAuthProvider());
 }
 
 export async function signOutCurrent(): Promise<void> {
@@ -113,4 +116,40 @@ export async function listGames(uid: string): Promise<Array<SavedGame & { id: st
     return tb - ta;
   });
   return rows;
+}
+
+async function signInGoogleViaBridge(a: Auth): Promise<void> {
+  const bridge = window.open('/auth/popup', 'firebase-auth', 'popup=yes,width=520,height=640');
+  if (!bridge) throw new Error('auth/popup-blocked');
+
+  await new Promise<void>((resolve, reject) => {
+    let off = () => {};
+    let interval = 0;
+    let timeout = 0;
+
+    const cleanup = () => {
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+      off();
+    };
+
+    off = onAuthStateChanged(a, (user) => {
+      if (!user) return;
+      cleanup();
+      resolve();
+    });
+
+    interval = window.setInterval(() => {
+      if (!bridge.closed) return;
+      const user = a.currentUser;
+      cleanup();
+      if (user) resolve();
+      else reject(new Error('auth/popup-closed-by-user'));
+    }, 300);
+
+    timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error('auth/popup-timeout'));
+    }, 120000);
+  });
 }

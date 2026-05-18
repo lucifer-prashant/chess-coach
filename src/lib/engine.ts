@@ -274,3 +274,24 @@ export function getOpponent(): StockfishEngine {
   if (!opponentSingleton) opponentSingleton = new StockfishEngine(pickWorkerUrl());
   return opponentSingleton;
 }
+
+/**
+ * Spawn both engines + run a tiny depth-1 search so the WASM is fetched,
+ * compiled, and JITed before the user's first real move. Idempotent.
+ */
+let warmed = false;
+export async function warmEngines(): Promise<void> {
+  if (warmed || typeof window === 'undefined') return;
+  warmed = true;
+  const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  const a = getAnalyzer();
+  const o = getOpponent();
+  try {
+    await Promise.all([
+      a.analyze({ fen: startFen, depth: 1, multipv: 1 }),
+      o.analyze({ fen: startFen, depth: 1, multipv: 1 }),
+    ]);
+  } catch {
+    warmed = false; // allow retry
+  }
+}

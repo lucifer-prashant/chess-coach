@@ -18,7 +18,7 @@ import OpeningBadge from './OpeningBadge';
 import GameSummary from './GameSummary';
 import { useToast } from './Toast';
 import { useGame } from '@/lib/store';
-import { getAnalyzer, getOpponent, type Score } from '@/lib/engine';
+import { getAnalyzer, getOpponent, warmEngines, type Score } from '@/lib/engine';
 import { classify, scoreToCp } from '@/lib/classify';
 import { detectFlags, detectPhase } from '@/lib/detectors';
 import { explainMove, type ExplainInput } from '@/lib/nim';
@@ -69,8 +69,9 @@ export default function PlayScreen() {
   const setSettings = useGame((s) => s.setSettings);
 
   useEffect(() => {
-    getAnalyzer().ensureReady().catch(() => {});
-    getOpponent().ensureReady().catch(() => {});
+    // Cold-start warmup: spawn engines + JIT-compile WASM with a depth-1 search
+    // so the user's first real move/hint doesn't pay the compile cost.
+    warmEngines();
   }, []);
 
   // ---- start game (declared early so keyboard handler can call it) ----

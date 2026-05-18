@@ -2,7 +2,7 @@
 
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import {
-  getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut,
+  getAuth, GoogleAuthProvider, signInWithPopup, signOut,
   onAuthStateChanged, type Auth, type User,
 } from 'firebase/auth';
 import {
@@ -49,19 +49,15 @@ export function fbDb(): Firestore | null {
 export async function signInGoogle(): Promise<void> {
   const a = fbAuth();
   if (!a) throw new Error('Firebase not configured. Add NEXT_PUBLIC_FIREBASE_* env vars.');
-  await signInWithRedirect(a, new GoogleAuthProvider());
+  // Popup avoids the signInWithRedirect breakage on Chrome with 3rd-party-cookie
+  // restrictions + COOP same-origin. Firebase 11 SDK handles popup + COOP fine
+  // (uses postMessage instead of window.opener).
+  await signInWithPopup(a, new GoogleAuthProvider());
 }
 
-/** Call on app load to capture the redirect result (no-op if no pending redirect). */
+/** No-op now that we use popup auth; kept as stable export for callers. */
 export async function consumeRedirect(): Promise<User | null> {
-  const a = fbAuth();
-  if (!a) return null;
-  try {
-    const result = await getRedirectResult(a);
-    return result?.user ?? null;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export async function signOutCurrent(): Promise<void> {

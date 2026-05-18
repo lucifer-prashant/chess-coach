@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { signInGoogle, signOutCurrent, watchAuth, consumeRedirect } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
 
@@ -31,11 +32,13 @@ export default function AuthBadge() {
   const initial = (name[0] ?? '?').toUpperCase();
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent/20 font-semibold text-accent">
-        {initial}
-      </span>
-      <span className="hidden text-muted sm:inline">{name}</span>
-      <button onClick={() => signOutCurrent()} className="btn !px-2 !py-1 text-xs">
+      <Link href="/history" className="flex items-center gap-2 rounded-full bg-accent/20 px-2 py-1 pr-3 transition hover:bg-accent/30">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent font-semibold text-white">
+          {initial}
+        </span>
+        <span className="hidden text-text sm:inline">{name}</span>
+      </Link>
+      <button onClick={() => signOutCurrent()} className="btn text-xs">
         sign out
       </button>
     </div>

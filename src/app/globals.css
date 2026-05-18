@@ -8,8 +8,8 @@
 
 html, body {
   background:
-    radial-gradient(1200px 600px at 80% -10%, rgba(124, 92, 255, 0.08), transparent 60%),
-    radial-gradient(900px 500px at -10% 110%, rgba(54, 197, 214, 0.06), transparent 60%),
+    radial-gradient(1200px 600px at 80% -10%, rgba(124, 92, 255, 0.10), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(54, 197, 214, 0.08), transparent 60%),
     #0b0d12;
   color: #e6e8ef;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -22,14 +22,22 @@ html, body {
   display: block;
 }
 
-/* Keep brown.css chequer; tint highlights to accent. */
 .cg-wrap cg-board square.last-move { background-color: rgba(124, 92, 255, 0.42) !important; }
 .cg-wrap cg-board square.selected { background-color: rgba(124, 92, 255, 0.55) !important; }
 .cg-wrap cg-board square.check {
   background: radial-gradient(ellipse at center, rgba(232,85,59,0.85) 0%, rgba(232,85,59,0.4) 35%, rgba(232,85,59,0) 70%) !important;
 }
 
-/* Hint arrows already use built-in green/yellow/red brushes via setAutoShapes. */
+/* Board themes — override brown.css backgrounds. */
+.board-theme-green cg-board square.light { background: #eeeed2 !important; }
+.board-theme-green cg-board square.dark  { background: #769656 !important; }
+.board-theme-blue  cg-board square.light { background: #dee3e6 !important; }
+.board-theme-blue  cg-board square.dark  { background: #8ca2ad !important; }
+.board-theme-slate cg-board square.light { background: #d6d6d6 !important; }
+.board-theme-slate cg-board square.dark  { background: #5b6770 !important; }
+
+/* Coordinates: chessground draws via ::before pseudo; hide via class. */
+.no-coords coords { display: none !important; }
 
 /* ----------- Misc UI ------------ */
 * { -webkit-tap-highlight-color: transparent; }
@@ -37,7 +45,7 @@ html, body {
 .glass {
   background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
   border: 1px solid rgba(255,255,255,0.06);
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(8px);
 }
 
 .card {
@@ -46,6 +54,7 @@ html, body {
   border-radius: 14px;
 }
 
+/* Buttons */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -53,27 +62,60 @@ html, body {
   gap: 0.5rem;
   padding: 0.55rem 1rem;
   border-radius: 10px;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 0.875rem;
-  transition: transform 0.05s ease, background 0.15s, border-color 0.15s, opacity 0.15s;
+  line-height: 1;
+  transition: transform 0.06s ease, background 0.18s, border-color 0.18s, opacity 0.18s, box-shadow 0.18s;
   border: 1px solid #252a3a;
   background: #161922;
   color: #e6e8ef;
+  min-height: 40px;
+  cursor: pointer;
+  white-space: nowrap;
 }
-.btn:hover { background: #1c2030; }
+.btn:hover { background: #1c2030; border-color: #2f3550; }
 .btn:active { transform: translateY(1px); }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:disabled:hover { background: #161922; border-color: #252a3a; }
+
+.btn-sm {
+  padding: 0.4rem 0.7rem;
+  font-size: 0.78rem;
+  min-height: 32px;
+  border-radius: 8px;
+}
+
+.btn-icon {
+  padding: 0.5rem;
+  min-width: 40px;
+}
+
 .btn-primary {
   background: linear-gradient(180deg, #8a6bff 0%, #6a4cff 100%);
   border-color: transparent;
   color: white;
-  box-shadow: 0 6px 18px -8px rgba(124,92,255,0.6);
+  box-shadow: 0 8px 20px -10px rgba(124,92,255,0.7);
 }
-.btn-primary:hover { background: linear-gradient(180deg, #9479ff 0%, #7558ff 100%); }
+.btn-primary:hover { background: linear-gradient(180deg, #9479ff 0%, #7558ff 100%); border-color: transparent; }
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: #8a90a3;
+}
+.btn-ghost:hover { background: rgba(255,255,255,0.04); color: #e6e8ef; border-color: transparent; }
+
 .btn-danger {
   background: linear-gradient(180deg, #f47057 0%, #d8462b 100%);
   border-color: transparent;
   color: white;
+}
+.btn-danger:hover { background: linear-gradient(180deg, #ff7e64 0%, #e85738 100%); border-color: transparent; }
+
+.btn-success {
+  background: linear-gradient(180deg, #5fd97a 0%, #3cc05f 100%);
+  border-color: transparent;
+  color: #0a1a10;
 }
 
 .chip {
@@ -83,14 +125,44 @@ html, body {
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
   font-size: 0.7rem;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
-/* subtle scrollbar */
+/* Range inputs — bigger, prettier */
+input[type=range] {
+  appearance: none;
+  height: 6px;
+  background: #252a3a;
+  border-radius: 999px;
+  outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #9479ff 0%, #6a4cff 100%);
+  cursor: pointer;
+  box-shadow: 0 4px 10px -2px rgba(124,92,255,0.6);
+  border: 2px solid #0b0d12;
+}
+input[type=range]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #9479ff 0%, #6a4cff 100%);
+  cursor: pointer;
+  border: 2px solid #0b0d12;
+}
+
+/* Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #2a2f42; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #3a4060; }
 ::-webkit-scrollbar-track { background: transparent; }
 
+/* Animations */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
@@ -99,4 +171,68 @@ html, body {
   background: linear-gradient(90deg, #1c2030 25%, #252a3a 50%, #1c2030 75%);
   background-size: 200% 100%;
   animation: shimmer 1.6s infinite linear;
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(110%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.toast-enter { animation: slide-in-right 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fade-in 0.2s ease-out; }
+
+@keyframes pop {
+  0% { transform: scale(0.95); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.pop { animation: pop 0.2s cubic-bezier(0.2,0.8,0.2,1); }
+
+/* Sticky top-nav background */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgba(11, 13, 18, 0.75);
+  backdrop-filter: saturate(140%) blur(10px);
+  -webkit-backdrop-filter: saturate(140%) blur(10px);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+/* Tabs in navbar */
+.nav-tab {
+  position: relative;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #8a90a3;
+  transition: color 0.15s, background 0.15s;
+}
+.nav-tab:hover { color: #e6e8ef; background: rgba(255,255,255,0.04); }
+.nav-tab[data-active="true"] {
+  color: #e6e8ef;
+  background: rgba(124, 92, 255, 0.14);
+}
+
+/* Kbd */
+kbd {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.72rem;
+  padding: 0.12rem 0.4rem;
+  background: #1c2030;
+  border: 1px solid #2f3550;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  color: #e6e8ef;
+}
+
+/* Focus ring */
+*:focus-visible {
+  outline: 2px solid #7c5cff;
+  outline-offset: 2px;
+  border-radius: 6px;
 }

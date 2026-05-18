@@ -7,7 +7,7 @@ import {
 } from 'firebase/auth';
 import {
   getFirestore, collection, addDoc, query, where, getDocs,
-  serverTimestamp, type Firestore,
+  serverTimestamp, deleteDoc, doc, type Firestore,
 } from 'firebase/firestore';
 import type { MoveRecord, GameSettings } from './store';
 
@@ -98,6 +98,12 @@ export async function saveGame(uid: string, game: Omit<SavedGame, 'uid' | 'creat
     ...game,
     createdAt: serverTimestamp(),
   });
+}
+
+export async function deleteGame(id: string): Promise<void> {
+  const d = fbDb();
+  if (!d) return;
+  await deleteDoc(doc(d, 'games', id));
 }
 
 export async function listGames(uid: string): Promise<Array<SavedGame & { id: string }>> {

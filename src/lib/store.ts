@@ -33,6 +33,8 @@ export interface TimeControl {
 
 export type LlmStrategy = 'always' | 'auto' | 'manual';
 
+export type BoardTheme = 'brown' | 'green' | 'blue' | 'slate';
+
 export interface GameSettings {
   userColor: Color;            // which color the human plays
   elo: number;                 // opponent strength
@@ -44,6 +46,13 @@ export interface GameSettings {
   llmEnabled: boolean;
   llmStrategy: LlmStrategy;    // when to auto-call the LLM
   audioEnabled: boolean;
+  // New UX prefs
+  boardFlipped: boolean;       // visual flip (overrides userColor for orientation)
+  boardTheme: BoardTheme;
+  showCoords: boolean;
+  showBestArrowInReview: boolean;
+  kidMode: boolean;            // unlimited undo, gentler labels (UI only)
+  animationsEnabled: boolean;
 }
 
 interface GameState {
@@ -86,6 +95,7 @@ interface GameState {
   resetExplore: () => void;
   exitExplore: () => void;
   setHint: (lines: AnalysisLine[] | null) => void;
+  syncExploreToViewIndex: (idx: number) => void;
   undo: () => void;
   redo: () => void;
   resign: () => void;
@@ -104,6 +114,12 @@ const DEFAULT_SETTINGS: GameSettings = {
   llmEnabled: false,
   llmStrategy: 'auto',
   audioEnabled: true,
+  boardFlipped: false,
+  boardTheme: 'brown',
+  showCoords: true,
+  showBestArrowInReview: true,
+  kidMode: false,
+  animationsEnabled: true,
 };
 
 const STORAGE_KEY = 'chess-coach:settings';
@@ -217,7 +233,7 @@ export const useGame = create<GameState>((set, get) => ({
       viewIndex: null,
     });
 
-    // End checks
+    // End checks + auto-enter explore
     if (chess.isGameOver()) {
       let reason: EndReason = null;
       let result: 'white' | 'black' | 'draw' = 'draw';
@@ -228,7 +244,11 @@ export const useGame = create<GameState>((set, get) => ({
       else if (chess.isInsufficientMaterial()) reason = 'insufficient';
       else if (chess.isThreefoldRepetition()) reason = 'threefold';
       else if (chess.isDraw()) reason = 'fifty';
-      set({ status: 'ended', endReason: reason, endResult: result });
+      const finalFen = chess.fen();
+      set({
+        status: 'ended', endReason: reason, endResult: result,
+        exploreActive: true, exploreFen: finalFen, exploreEntryFen: finalFen, exploreLast: null,
+      });
     }
 
     return record;
@@ -261,12 +281,13 @@ export const useGame = create<GameState>((set, get) => ({
     for (const m of g.history) {
       try { chess.move(m.san); } catch {/* tolerate */}
     }
+    const finalFen = chess.fen();
     set({
       status: 'ended',
       endReason: (g.endReason as EndReason),
       endResult: g.result,
       chess,
-      fen: chess.fen(),
+      fen: finalFen,
       history: g.history,
       cursor: g.history.length,
       toMove: chess.turn(),
@@ -276,10 +297,19 @@ export const useGame = create<GameState>((set, get) => ({
       pendingHint: null,
       pendingPromotion: null,
       viewIndex: 0,
-      exploreActive: false,
+      exploreActive: true,
+      exploreFen: g.history[0]?.fenAfter ?? finalFen,
+      exploreEntryFen: g.history[0]?.fenAfter ?? finalFen,
       exploreLast: null,
       settings: g.settings ?? get().settings,
     });
+  },
+
+  syncExploreToViewIndex: (idx: number) => {
+    const { history } = get();
+    if (idx < 0 || idx >= history.length) return;
+    const fen = history[idx].fenAfter;
+    set({ exploreFen: fen, exploreEntryFen: fen, exploreLast: null, pendingHint: null });
   },
 
   startExplore: (fromFen) => {
@@ -319,8 +349,8 @@ export const useGame = create<GameState>((set, get) => ({
   undo: () => {
     const { chess, history, status } = get();
     if (history.length === 0 || status !== 'playing') return;
-    // Undo one full turn: opponent move + your move if applicable.
-    const popCount = history.length >= 2 ? 2 : 1;
+    // Kid mode: undo a single ply for forgiveness; normal: a full turn.
+    const popCount = get().settings.kidMode ? 1 : (history.length >= 2 ? 2 : 1);
     for (let i = 0; i < popCount; i++) chess.undo();
     const nextHistory = history.slice(0, -popCount);
     set({

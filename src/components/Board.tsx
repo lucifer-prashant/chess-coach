@@ -19,8 +19,7 @@ function computeSize(): number {
   if (typeof window === 'undefined') return 480;
   const w = window.innerWidth;
   const h = window.innerHeight;
-  // leave room: ~520px for right panel + 60 eval bar + paddings on wide; less on narrow
-  const horizPanels = w >= 1024 ? 520 + 60 + 80 : 60;
+  const horizPanels = w >= 1024 ? 500 + 60 + 80 : 60;
   const maxFromWidth = w - horizPanels;
   const maxFromHeight = h - 220;
   const raw = Math.min(640, maxFromWidth, maxFromHeight);
@@ -37,6 +36,9 @@ export default function Board({ hintLines, onMove }: BoardProps) {
   const viewedFen = useGame((s) =>
     s.viewIndex !== null && s.history[s.viewIndex] ? s.history[s.viewIndex].fenAfter : null,
   );
+  const viewedMove = useGame((s) =>
+    s.viewIndex !== null && s.history[s.viewIndex] ? s.history[s.viewIndex] : null,
+  );
   const exploreActive = useGame((s) => s.exploreActive);
   const exploreFen = useGame((s) => s.exploreFen);
   const exploreLast = useGame((s) => s.exploreLast);
@@ -47,47 +49,52 @@ export default function Board({ hintLines, onMove }: BoardProps) {
   const liveToMove = useGame((s) => s.toMove);
   const toMove = exploreActive ? (fenSideToMove === 'white' ? 'w' : 'b') : liveToMove;
   const userColor = useGame((s) => s.settings.userColor);
+  const flipped = useGame((s) => s.settings.boardFlipped);
+  const theme = useGame((s) => s.settings.boardTheme);
+  const showCoords = useGame((s) => s.settings.showCoords);
+  const showBestArrowReview = useGame((s) => s.settings.showBestArrowInReview);
+  const animationsEnabled = useGame((s) => s.settings.animationsEnabled);
   const status = useGame((s) => s.status);
   const setPromotion = useGame((s) => s.setPromotion);
   const lastUci = useGame((s) => s.history[s.history.length - 1]?.uci);
   const lastMove = useMemo<[Key, Key] | undefined>(() => {
-    if (exploreActive) {
-      return exploreLast ? [exploreLast.from as Key, exploreLast.to as Key] : undefined;
+    if (exploreActive) return exploreLast ? [exploreLast.from as Key, exploreLast.to as Key] : undefined;
+    if (reviewing && viewedMove?.uci) {
+      return [viewedMove.uci.slice(0, 2) as Key, viewedMove.uci.slice(2, 4) as Key];
     }
     return lastUci ? [lastUci.slice(0, 2) as Key, lastUci.slice(2, 4) as Key] : undefined;
-  }, [lastUci, exploreActive, exploreLast]);
+  }, [lastUci, exploreActive, exploreLast, reviewing, viewedMove]);
 
-  // Recompute size on window resize.
+  const baseOrient = userColor === 'w' ? 'white' : 'black';
+  const orientation = flipped ? (baseOrient === 'white' ? 'black' : 'white') : baseOrient;
+
   useEffect(() => {
     const onResize = () => setSize(computeSize());
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Initialize chessground once.
   useEffect(() => {
     if (!boardRef.current) return;
     if (apiRef.current) return;
     const config: Config = {
       fen,
-      orientation: userColor === 'w' ? 'white' : 'black',
+      orientation,
       turnColor: toMove === 'w' ? 'white' : 'black',
+      coordinates: showCoords,
       movable: {
         free: false,
-        color: userColor === 'w' ? 'white' : 'black',
+        color: baseOrient,
         showDests: true,
         dests: computeDests(fen),
-        events: {
-          after: (orig, dest) => handleMove(orig, dest),
-        },
+        events: { after: (orig, dest) => handleMove(orig, dest) },
       },
       draggable: { showGhost: true },
-      animation: { enabled: true, duration: 180 },
+      animation: { enabled: animationsEnabled, duration: animationsEnabled ? 180 : 0 },
       highlight: { lastMove: true, check: true },
       drawable: { enabled: true, visible: true },
     };
     apiRef.current = Chessground(boardRef.current, config);
-    // Force layout flush + redraw to lock in geometry.
     requestAnimationFrame(() => apiRef.current?.redrawAll());
 
     return () => {
@@ -97,34 +104,33 @@ export default function Board({ hintLines, onMove }: BoardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Redraw on size change.
   useEffect(() => {
     if (apiRef.current) requestAnimationFrame(() => apiRef.current?.redrawAll());
   }, [size]);
 
-  // Sync state.
   useEffect(() => {
     if (!apiRef.current) return;
-    const canMove =
-      exploreActive
-        ? true
-        : !reviewing && status === 'playing' && toMove === userColor;
+    const canMove = exploreActive
+      ? true
+      : !reviewing && status === 'playing' && toMove === userColor;
     const movableColor = exploreActive
       ? (toMove === 'w' ? 'white' : 'black')
-      : (userColor === 'w' ? 'white' : 'black');
+      : baseOrient;
     apiRef.current.set({
       fen,
-      orientation: userColor === 'w' ? 'white' : 'black',
+      orientation,
       turnColor: toMove === 'w' ? 'white' : 'black',
-      lastMove: reviewing ? undefined : lastMove,
+      coordinates: showCoords,
+      animation: { enabled: animationsEnabled, duration: animationsEnabled ? 180 : 0 },
+      lastMove,
       movable: {
         color: movableColor,
         dests: canMove ? computeDests(fen) : new Map(),
       },
     });
-  }, [fen, toMove, userColor, status, lastMove, reviewing, exploreActive]);
+  }, [fen, toMove, userColor, status, lastMove, reviewing, exploreActive, orientation, showCoords, animationsEnabled, baseOrient]);
 
-  // Hint arrows.
+  // Arrows: hints (live), best move (review).
   useEffect(() => {
     if (!apiRef.current) return;
     const shapes: DrawShape[] = [];
@@ -139,8 +145,15 @@ export default function Board({ hintLines, onMove }: BoardProps) {
         });
       });
     }
+    if (reviewing && showBestArrowReview && viewedMove?.bestMoveUci && viewedMove.bestMoveUci !== viewedMove.uci) {
+      shapes.push({
+        orig: viewedMove.bestMoveUci.slice(0, 2) as Key,
+        dest: viewedMove.bestMoveUci.slice(2, 4) as Key,
+        brush: 'green',
+      });
+    }
     apiRef.current.setAutoShapes(shapes);
-  }, [hintLines, reviewing]);
+  }, [hintLines, reviewing, showBestArrowReview, viewedMove]);
 
   function handleMove(orig: Key, dest: Key) {
     const st = useGame.getState();
@@ -163,9 +176,12 @@ export default function Board({ hintLines, onMove }: BoardProps) {
     onMove?.(orig as string, dest as string);
   }
 
+  const themeClass = theme === 'brown' ? '' : `board-theme-${theme}`;
+  const coordsClass = showCoords ? '' : 'no-coords';
+
   return (
     <div
-      className="mx-auto overflow-hidden rounded-lg shadow-2xl ring-1 ring-border"
+      className={'mx-auto overflow-hidden rounded-lg shadow-2xl ring-1 ring-border ' + themeClass + ' ' + coordsClass}
       style={{ width: `${size}px`, height: `${size}px` }}
     >
       <div

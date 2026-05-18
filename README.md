@@ -1,5 +1,7 @@
 # chess.coach
 
+> **🚧 WIP — more features upcoming.** Active development. Puzzle mode, weakness reports, right-click annotations, consequence arrows for blunders, and a viewIndex-aware coach are next. See `TODO.md`.
+
 Local Stockfish-powered chess coach. Play against the engine in your browser. Every move classified instantly. Optional LLM commentary explains the why.
 
 ## What it does

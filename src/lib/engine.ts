@@ -62,8 +62,9 @@ export class StockfishEngine {
 
   private async init(): Promise<void> {
     await this.waitFor('uciok', () => this.send('uci'));
-    this.send('setoption name Threads value 1');
-    this.send('setoption name Hash value 32');
+    const threads = pickThreads();
+    this.send(`setoption name Threads value ${threads}`);
+    this.send('setoption name Hash value 64');
     await this.isReady();
     this.ready = true;
   }
@@ -263,6 +264,14 @@ function pickWorkerUrl(): string {
   const iso = (window as any).crossOriginIsolated === true;
   const sab = typeof (window as any).SharedArrayBuffer !== 'undefined';
   return iso && sab ? '/sf/stockfish-18.js' : '/sf/stockfish-18-single.js';
+}
+
+function pickThreads(): number {
+  if (typeof navigator === 'undefined') return 1;
+  // Two engines run concurrently (analyzer + opponent). Split the cores so they
+  // don't fight each other. Cap at 4 per engine to avoid diminishing returns.
+  const cores = navigator.hardwareConcurrency || 2;
+  return Math.max(1, Math.min(4, Math.floor(cores / 2)));
 }
 
 export function getAnalyzer(): StockfishEngine {

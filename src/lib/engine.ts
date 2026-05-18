@@ -255,52 +255,45 @@ function parseInfo(line: string): AnalysisLine | null {
 
 /* ---------- pool ---------- */
 
-let analyzerSingleton: StockfishEngine | null = null;
-let opponentSingleton: StockfishEngine | null = null;
+// Single shared engine — one WASM worker, all ops queue through it.
+// Two concurrent workers loading the same WASM can race on init; one silently hangs.
+let engineSingleton: StockfishEngine | null = null;
 
 function pickWorkerUrl(): string {
-  // Use multi-threaded build if SharedArrayBuffer + crossOriginIsolated, else single.
-  if (typeof window === 'undefined') return '/sf/stockfish-18-single.js';
-  const iso = (window as any).crossOriginIsolated === true;
-  const sab = typeof (window as any).SharedArrayBuffer !== 'undefined';
-  return iso && sab ? '/sf/stockfish-18.js' : '/sf/stockfish-18-single.js';
+  // Lite-single: 7 MB, no CORS headers required, reliable everywhere.
+  return '/sf/stockfish-18-lite-single.js';
 }
 
 function pickThreads(): number {
-  if (typeof navigator === 'undefined') return 1;
-  // Two engines run concurrently (analyzer + opponent). Split the cores so they
-  // don't fight each other. Cap at 4 per engine to avoid diminishing returns.
-  const cores = navigator.hardwareConcurrency || 2;
-  return Math.max(1, Math.min(4, Math.floor(cores / 2)));
+  // Single-thread WASM build — Threads option is ignored by the engine.
+  return 1;
+}
+
+function getEngine(): StockfishEngine {
+  if (!engineSingleton) engineSingleton = new StockfishEngine(pickWorkerUrl());
+  return engineSingleton;
 }
 
 export function getAnalyzer(): StockfishEngine {
-  if (!analyzerSingleton) analyzerSingleton = new StockfishEngine(pickWorkerUrl());
-  return analyzerSingleton;
+  return getEngine();
 }
 
 export function getOpponent(): StockfishEngine {
-  if (!opponentSingleton) opponentSingleton = new StockfishEngine(pickWorkerUrl());
-  return opponentSingleton;
+  return getEngine();
 }
 
 /**
- * Spawn both engines + run a tiny depth-1 search so the WASM is fetched,
- * compiled, and JITed before the user's first real move. Idempotent.
+ * Create the engine and run a depth-1 warmup so WASM is fetched + JIT-compiled
+ * before the user's first real move. Idempotent.
  */
 let warmed = false;
 export async function warmEngines(): Promise<void> {
   if (warmed || typeof window === 'undefined') return;
   warmed = true;
   const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-  const a = getAnalyzer();
-  const o = getOpponent();
   try {
-    await Promise.all([
-      a.analyze({ fen: startFen, depth: 1, multipv: 1 }),
-      o.analyze({ fen: startFen, depth: 1, multipv: 1 }),
-    ]);
+    await getEngine().analyze({ fen: startFen, depth: 1, multipv: 1 });
   } catch {
-    warmed = false; // allow retry
+    warmed = false;
   }
 }

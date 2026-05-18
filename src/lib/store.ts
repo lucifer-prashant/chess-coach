@@ -79,8 +79,10 @@ interface GameState {
   exploreEntryFen: string;
   exploreLast: { from: string; to: string } | null;
   settings: GameSettings;
+  settingsHydrated: boolean;
 
   // actions
+  hydrateSettings: () => void;
   newGame: (overrides?: Partial<GameSettings>) => void;
   applyMove: (san: string | { from: string; to: string; promotion?: string }) => MoveRecord | null;
   setPromotion: (m: { from: string; to: string } | null) => void;
@@ -161,7 +163,18 @@ export const useGame = create<GameState>((set, get) => ({
   exploreFen: new Chess().fen(),
   exploreEntryFen: new Chess().fen(),
   exploreLast: null,
-  settings: typeof window === 'undefined' ? DEFAULT_SETTINGS : loadSettings(),
+  settings: DEFAULT_SETTINGS,
+  settingsHydrated: false,
+
+  hydrateSettings: () => {
+    const settings = loadSettings();
+    set({
+      settings,
+      settingsHydrated: true,
+      whiteMs: settings.timeControl.initialMs,
+      blackMs: settings.timeControl.initialMs,
+    });
+  },
 
   newGame: (overrides) => {
     const settings = { ...get().settings, ...(overrides ?? {}) };

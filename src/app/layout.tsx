@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { ToastProvider } from '@/components/Toast';
+import StoreHydrator from '@/components/StoreHydrator';
 
 export const metadata: Metadata = {
   title: 'Chess Coach — play, get coached',
@@ -16,7 +17,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="stylesheet" href="/cg/chessground.cburnett.css" />
       </head>
       <body suppressHydrationWarning className="min-h-screen bg-bg text-text antialiased">
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <StoreHydrator />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

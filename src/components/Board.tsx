@@ -29,6 +29,10 @@ function computeSize(): number {
 export default function Board({ hintLines, onMove }: BoardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<Api | null>(null);
+  // Keep a ref to the latest onMove so the Chessground event handler (captured once at mount)
+  // always calls the current callback, even after toMove/status change.
+  const onMoveRef = useRef(onMove);
+  onMoveRef.current = onMove;
   const [size, setSize] = useState<number>(() => (typeof window === 'undefined' ? 480 : computeSize()));
 
   const liveFen = useGame((s) => s.fen);
@@ -173,7 +177,7 @@ export default function Board({ hintLines, onMove }: BoardProps) {
       if (!ok) apiRef.current?.set({ fen: sourceFen });
       return;
     }
-    onMove?.(orig as string, dest as string);
+    onMoveRef.current?.(orig as string, dest as string);
   }
 
   const themeClass = theme === 'brown' ? '' : `board-theme-${theme}`;

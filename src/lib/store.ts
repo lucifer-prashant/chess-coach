@@ -180,12 +180,13 @@ export const useGame = create<GameState>((set, get) => ({
     const settings = { ...get().settings, ...(overrides ?? {}) };
     saveSettings(settings);
     const chess = new Chess();
+    const startFen = chess.fen();
     set({
       status: 'playing',
       endReason: null,
       endResult: null,
       chess,
-      fen: chess.fen(),
+      fen: startFen,
       history: [],
       cursor: 0,
       whiteMs: settings.timeControl.initialMs || 0,
@@ -195,6 +196,10 @@ export const useGame = create<GameState>((set, get) => ({
       pendingHint: null,
       pendingPromotion: null,
       viewIndex: null,
+      exploreActive: false,
+      exploreFen: startFen,
+      exploreEntryFen: startFen,
+      exploreLast: null,
       settings,
     });
   },

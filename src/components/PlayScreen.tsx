@@ -315,6 +315,9 @@ export default function PlayScreen() {
     const beforeAnalysis = await analyzer.analyze({ fen: fenBefore, depth: settings.depth, multipv: 3 }).catch(() => null);
     const afterAnalysis = await analyzer.analyze({ fen: fenAfter, depth: settings.depth, multipv: 1 }).catch(() => null);
 
+    // Captured so the SF-reply block below can use it for opp classification
+    let capturedPlayedScore: import('@/lib/engine').Score | null = null;
+
     if (beforeAnalysis && afterAnalysis && aliveCheck()) {
       const bestLine = beforeAnalysis.lines[0];
       const playedScore = afterAnalysis.lines[0]?.score ?? null;
@@ -366,6 +369,7 @@ export default function PlayScreen() {
           evalBefore: bestLine.score, evalAfter: playedScore,
           topLines: beforeAnalysis.lines,
         });
+        capturedPlayedScore = playedScore;
         setCurrentScore(playedScore);
         setCurrentWhiteToMove(!moverWasWhite);
         if (settings.audioEnabled && c.label === 'blunder') playCue('blunder');
@@ -403,11 +407,25 @@ export default function PlayScreen() {
         else playCue('move');
       }
       const fenAfterOpp = useGame.getState().fen;
+      const oppMoverIsWhite = !moverWasWhite;
       analyzer.analyze({ fen: fenAfterOpp, depth: settings.depth, multipv: 1 })
         .then((r) => {
           if (r.lines[0] && useGame.getState().fen === fenAfterOpp) {
             setCurrentScore(r.lines[0].score);
             setCurrentWhiteToMove(useGame.getState().toMove === 'w');
+            // Attach evalAfter + classification to SF's move for eval graph and accuracy
+            if (capturedPlayedScore) {
+              const evalBeforeOpp = scoreToCp(capturedPlayedScore, oppMoverIsWhite);
+              const evalAfterOpp = -scoreToCp(r.lines[0].score, !oppMoverIsWhite);
+              const oppC = classify(evalBeforeOpp, evalAfterOpp);
+              attachAnalysisToLastMove({
+                classification: oppC,
+                evalBefore: capturedPlayedScore,
+                evalAfter: r.lines[0].score,
+              });
+            } else {
+              attachAnalysisToLastMove({ evalAfter: r.lines[0].score });
+            }
           }
         })
         .catch(() => {});

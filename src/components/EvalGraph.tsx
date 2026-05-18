@@ -15,17 +15,16 @@ export default function EvalGraph() {
 
   const points = useMemo(() => {
     if (history.length === 0) return [] as Array<{ x: number; y: number; cp: number }>;
+    let lastCp = 0;
     return history.map((m, i) => {
-      let cp = 0;
+      let cp = lastCp;
       if (m.evalAfter) {
         const whiteSide = m.by === 'w';
-        // evalAfter is side-to-move POV; after a white move, black is to move, so flip.
         const cpFromMover = scoreToCp(m.evalAfter, !whiteSide);
-        cp = whiteSide ? -cpFromMover : cpFromMover; // standardize: positive = white
-        // Above is double-flip; simplify:
         cp = (whiteSide ? -1 : 1) * cpFromMover;
+        cp = Math.max(-CLAMP, Math.min(CLAMP, cp));
+        lastCp = cp;
       }
-      cp = Math.max(-CLAMP, Math.min(CLAMP, cp));
       const x = (i / Math.max(1, history.length - 1)) * W;
       const y = H / 2 - (cp / CLAMP) * (H / 2);
       return { x, y, cp };

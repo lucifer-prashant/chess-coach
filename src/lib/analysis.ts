@@ -39,7 +39,9 @@ export function analyzeGame(history: MoveRecord[], userColor: 'w' | 'b'): GameAn
       counts[m.classification.label] = (counts[m.classification.label] ?? 0) + 1;
       if (m.classification.label === 'blunder') blunders.push(m);
       if (m.classification.label === 'mistake') mistakes.push(m);
-      if (cp > biggestSwing) { biggestSwing = cp; worst = m; }
+      if (cp > biggestSwing && (m.classification.label === 'inaccuracy' || m.classification.label === 'mistake' || m.classification.label === 'blunder')) {
+        biggestSwing = cp; worst = m;
+      }
       if (cp < (best?.classification?.cpLoss ?? Infinity) && (m.classification.label === 'best' || m.classification.label === 'great' || m.classification.label === 'brilliant')) {
         best = m;
       }

@@ -1,5 +1,13 @@
 # chess.coach
-
+> **Note on first engine load**
+>
+> Stockfish runs fully in your browser. To keep Google sign-in and Firestore working reliably, the app currently uses the single-threaded Stockfish build.
+>
+> This means the **first engine load can take around ~1 minute** on some devices. This 1min load time of engine warming up will be felt in each refresh of the page, but the subsequent moves and analysis will be snappy.
+>
+> A fix is in progress: the main app will remain Firebase-friendly, while Stockfish moves into a separate isolated engine runtime with the required `COOP`/`COEP` headers. Communication will happen through a small message bridge, enabling multi-threaded Stockfish without breaking auth.
+>
+> **🚧 WIP — more features upcoming.** Active development. Puzzle mode, weakness reports, right-click annotations, consequence arrows for blunders, and a viewIndex-aware coach are next. See `TODO.md`.
 > **🚧 WIP — more features upcoming.** Active development. Puzzle mode, weakness reports, right-click annotations, consequence arrows for blunders, and a viewIndex-aware coach are next. See `TODO.md`.
 
 Local Stockfish-powered chess coach. Play against the engine in your browser. Every move classified instantly. Optional LLM commentary explains the why.
@@ -38,18 +46,6 @@ pnpm dev
 
 First run copies Stockfish + chessground assets from `node_modules/` into `public/`.
 
-### Firebase (optional)
-
-Create a Firebase project, enable Google Auth and Firestore, then drop the config into `.env.local`:
-
-```
-NEXT_PUBLIC_FIREBASE_API_KEY=...
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=...
-NEXT_PUBLIC_FIREBASE_SENDER_ID=...
-NEXT_PUBLIC_FIREBASE_APP_ID=...
-```
 
 ### NVIDIA NIM (optional)
 

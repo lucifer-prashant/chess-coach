@@ -179,7 +179,7 @@ export class StockfishEngine {
     // to ~50K NPS (for 2480 ELO) means depth 2-3 → plays like 800 ELO.
     // Instead: Skill Level injects blunders at the application level (hardware-agnostic),
     // combined with a depth cap so search quality scales with ELO consistently.
-    const { skill, depth } = eloToSkillDepth(clampedElo);
+    const { skill, depth, movetime } = eloToSkillDepth(clampedElo);
 
     let bestmove: string | null = null;
     const onLine = (line: string) => {
@@ -196,7 +196,7 @@ export class StockfishEngine {
       this.send('setoption name UCI_LimitStrength value false');
       await this.waitFor('readyok', () => this.send('isready'));
       this.send(`position fen ${fen}`);
-      await this.waitFor('bestmove', () => this.send(`go depth ${depth}`), signal);
+      await this.waitFor('bestmove', () => this.send(`go depth ${depth} movetime ${movetime}`), signal);
     } finally {
       this.listeners.delete(onLine);
     }
@@ -248,18 +248,23 @@ function parseInfo(line: string): AnalysisLine | null {
   return { multipv, depth, score, pv };
 }
 
-/** Map ELO → Skill Level (blunder rate) + search depth.
- *  Skill Level is hardware-agnostic (MultiPV randomness injection).
- *  Depth controls search quality consistently regardless of WASM speed. */
-function eloToSkillDepth(elo: number): { skill: number; depth: number } {
-  if (elo < 1500) return { skill: 2,  depth: 8  };
-  if (elo < 1700) return { skill: 5,  depth: 9  };
-  if (elo < 1900) return { skill: 8,  depth: 10 };
-  if (elo < 2100) return { skill: 11, depth: 11 };
-  if (elo < 2300) return { skill: 14, depth: 12 };
-  if (elo < 2500) return { skill: 16, depth: 13 };
-  if (elo < 2700) return { skill: 18, depth: 14 };
-  return               { skill: 20, depth: 14 };
+/** Map ELO → Skill Level (blunder randomness) + depth + movetime ceiling.
+ *
+ *  Skill Level benchmarks (full Stockfish community data):
+ *    SL 20 = ~3200+, SL 19 = ~2700, SL 18 = ~2400, SL 17 = ~2100,
+ *    SL 16 = ~1800,  SL 14 = ~1600, SL 12 = ~1400, SL 8  = ~1100
+ *
+ *  Lite-single WASM is ~15-20% weaker per level due to smaller NNUE + single thread.
+ *  movetime cap prevents multi-second stalls on mobile for deep searches. */
+function eloToSkillDepth(elo: number): { skill: number; depth: number; movetime: number } {
+  if (elo < 1500) return { skill: 5,  depth: 8,  movetime: 1500 };
+  if (elo < 1700) return { skill: 8,  depth: 9,  movetime: 2000 };
+  if (elo < 1900) return { skill: 11, depth: 10, movetime: 2500 };
+  if (elo < 2100) return { skill: 14, depth: 11, movetime: 3000 };
+  if (elo < 2300) return { skill: 17, depth: 12, movetime: 3000 };
+  if (elo < 2500) return { skill: 19, depth: 13, movetime: 4000 };
+  if (elo < 2700) return { skill: 20, depth: 14, movetime: 4000 };
+  return               { skill: 20, depth: 15, movetime: 5000 };
 }
 
 /* ---------- pool ---------- */

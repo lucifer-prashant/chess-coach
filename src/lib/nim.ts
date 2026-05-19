@@ -45,7 +45,8 @@ export async function explainMove(input: ExplainInput, opts: ExplainOptions): Pr
           role: 'system',
           content:
             'You are a concise chess coach. Explain a single move in 2 to 3 short sentences. ' +
-            'Do not restate the eval numbers. Speak naturally. ' +
+            'IMPORTANT: Only reference pieces and squares that are actually present in the FEN provided. ' +
+            'Do not invent piece locations. Do not restate the eval numbers. Speak naturally. ' +
             'Mention the better move only if one was clearly superior. End with a one-line lesson when relevant.',
         },
         { role: 'user', content: prompt },

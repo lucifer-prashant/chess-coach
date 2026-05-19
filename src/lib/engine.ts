@@ -173,18 +173,13 @@ export class StockfishEngine {
   private async runPlay(opts: PlayOptions): Promise<string | null> {
     const { fen, elo, signal } = opts;
     const clampedElo = Math.max(1320, Math.min(3190, Math.round(elo)));
-    // Only UCI_Elo limits strength — Skill Level stays at 20 (max).
-    // Stacking Skill Level + UCI_Elo causes double-weakening: random blunders
-    // on top of ELO-based errors, making play incoherent at lower ELOs.
-    const movetime =
-      clampedElo < 1500 ? 300 :
-      clampedElo < 1700 ? 500 :
-      clampedElo < 1900 ? 700 :
-      clampedElo < 2100 ? 1000 :
-      clampedElo < 2300 ? 1400 :
-      clampedElo < 2500 ? 1800 :
-      clampedElo < 2800 ? 2500 :
-      3000;
+
+    // UCI_LimitStrength/UCI_Elo is calibrated for full native Stockfish (50M+ NPS).
+    // The lite-single WASM does ~500K NPS naturally. UCI_Elo limiting it further
+    // to ~50K NPS (for 2480 ELO) means depth 2-3 → plays like 800 ELO.
+    // Instead: Skill Level injects blunders at the application level (hardware-agnostic),
+    // combined with a depth cap so search quality scales with ELO consistently.
+    const { skill, depth } = eloToSkillDepth(clampedElo);
 
     let bestmove: string | null = null;
     const onLine = (line: string) => {
@@ -197,12 +192,11 @@ export class StockfishEngine {
     try {
       this.send('ucinewgame');
       this.send('setoption name MultiPV value 1');
-      this.send('setoption name Skill Level value 20');
-      this.send('setoption name UCI_LimitStrength value true');
-      this.send(`setoption name UCI_Elo value ${clampedElo}`);
+      this.send(`setoption name Skill Level value ${skill}`);
+      this.send('setoption name UCI_LimitStrength value false');
       await this.waitFor('readyok', () => this.send('isready'));
       this.send(`position fen ${fen}`);
-      await this.waitFor('bestmove', () => this.send(`go movetime ${movetime}`), signal);
+      await this.waitFor('bestmove', () => this.send(`go depth ${depth}`), signal);
     } finally {
       this.listeners.delete(onLine);
     }
@@ -252,6 +246,20 @@ function parseInfo(line: string): AnalysisLine | null {
   }
   if (!score) return null;
   return { multipv, depth, score, pv };
+}
+
+/** Map ELO → Skill Level (blunder rate) + search depth.
+ *  Skill Level is hardware-agnostic (MultiPV randomness injection).
+ *  Depth controls search quality consistently regardless of WASM speed. */
+function eloToSkillDepth(elo: number): { skill: number; depth: number } {
+  if (elo < 1500) return { skill: 2,  depth: 8  };
+  if (elo < 1700) return { skill: 5,  depth: 9  };
+  if (elo < 1900) return { skill: 8,  depth: 10 };
+  if (elo < 2100) return { skill: 11, depth: 11 };
+  if (elo < 2300) return { skill: 14, depth: 12 };
+  if (elo < 2500) return { skill: 16, depth: 13 };
+  if (elo < 2700) return { skill: 18, depth: 14 };
+  return               { skill: 20, depth: 14 };
 }
 
 /* ---------- pool ---------- */

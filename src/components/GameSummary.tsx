@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useGame } from '@/lib/store';
 import { analyzeGame } from '@/lib/analysis';
 import { labelColor, labelText } from '@/lib/classify';
@@ -16,6 +16,11 @@ export default function GameSummary({ onJump }: { onJump: (ply: number) => void 
   const reviewMode = useGame((s) => s.reviewMode);
   const [open, setOpen] = useState(!reviewMode);
   const toast = useToast();
+
+  // Re-open on every new game end (useState only inits once at mount)
+  useEffect(() => {
+    if (status === 'ended' && !reviewMode) setOpen(true);
+  }, [status, reviewMode]);
 
   // Only compute when game is ended — analyzeGame is O(n) and runs on every move otherwise
   const a = useMemo(

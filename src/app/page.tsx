@@ -7,7 +7,7 @@ export default function Home() {
   return (
     <>
       <TopNav />
-      <main className="relative mx-auto max-w-6xl px-6 pb-20">
+      <main className="relative mx-auto max-w-6xl px-4 pb-20 sm:px-6">
 
         <section className="pt-12 pb-6">
           <div className="max-w-2xl">
@@ -15,7 +15,7 @@ export default function Home() {
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-good" />
               Stockfish 18 · runs in your browser · zero server
             </div>
-            <h1 className="text-6xl font-bold leading-[1.02] tracking-tight md:text-7xl">
+            <h1 className="text-4xl font-bold leading-[1.02] tracking-tight sm:text-6xl md:text-7xl">
               Play.<br />
               <span className="bg-gradient-to-r from-[#8a6bff] via-[#36c5d6] to-[#5fd97a] bg-clip-text text-transparent">
                 Get coached.

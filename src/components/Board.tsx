@@ -18,8 +18,13 @@ interface BoardProps {
 function computeSize(): number {
   if (typeof window === 'undefined') return 480;
   const w = window.innerWidth;
+  if (w < 1024) {
+    // Mobile: fill width minus padding, ignore height (URL bar changes cause scroll shift)
+    const raw = Math.min(640, w - 32);
+    return Math.max(280, Math.floor(raw / 8) * 8);
+  }
   const h = window.innerHeight;
-  const horizPanels = w >= 1024 ? 500 + 60 + 80 : 60;
+  const horizPanels = 500 + 60 + 80;
   const maxFromWidth = w - horizPanels;
   const maxFromHeight = h - 220;
   const raw = Math.min(640, maxFromWidth, maxFromHeight);
@@ -73,7 +78,14 @@ export default function Board({ hintLines, onMove }: BoardProps) {
   const orientation = flipped ? (baseOrient === 'white' ? 'black' : 'white') : baseOrient;
 
   useEffect(() => {
-    const onResize = () => setSize(computeSize());
+    let lastWidth = window.innerWidth;
+    const onResize = () => {
+      const newWidth = window.innerWidth;
+      if (newWidth !== lastWidth) {
+        lastWidth = newWidth;
+        setSize(computeSize());
+      }
+    };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);

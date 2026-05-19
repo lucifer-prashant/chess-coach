@@ -71,6 +71,8 @@ interface GameState {
   pendingHint: AnalysisLine[] | null;
   /** Bump to trigger an on-demand explanation request for the most recent user move. */
   explainNonce: number;
+  /** Set when a saved game is loaded for review — suppresses GameSummary auto-open. */
+  reviewMode: boolean;
   /** When non-null, board shows history[viewIndex].fenAfter — read-only review. */
   viewIndex: number | null;
   /** Explore (branch) mode — free-play sandbox. */
@@ -158,6 +160,7 @@ export const useGame = create<GameState>((set, get) => ({
   pendingPromotion: null,
   pendingHint: null,
   explainNonce: 0,
+  reviewMode: false,
   viewIndex: null,
   exploreActive: false,
   exploreFen: new Chess().fen(),
@@ -195,6 +198,7 @@ export const useGame = create<GameState>((set, get) => ({
       toMove: 'w',
       pendingHint: null,
       pendingPromotion: null,
+      reviewMode: false,
       viewIndex: null,
       exploreActive: false,
       exploreFen: startFen,
@@ -314,6 +318,7 @@ export const useGame = create<GameState>((set, get) => ({
       lastTickAt: null,
       pendingHint: null,
       pendingPromotion: null,
+      reviewMode: true,
       viewIndex: 0,
       exploreActive: true,
       exploreFen: g.history[0]?.fenAfter ?? finalFen,

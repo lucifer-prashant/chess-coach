@@ -85,11 +85,14 @@ export class StockfishEngine {
       this.listeners.add(onLine);
       const onAbort = () => {
         this.listeners.delete(onLine);
+        // Stop any running search so the engine is clean for the next queued job
+        this.send('stop');
         reject(new DOMException('aborted', 'AbortError'));
       };
       if (signal) {
         if (signal.aborted) {
           this.listeners.delete(onLine);
+          this.send('stop');
           reject(new DOMException('aborted', 'AbortError'));
           return;
         }
@@ -170,19 +173,18 @@ export class StockfishEngine {
   private async runPlay(opts: PlayOptions): Promise<string | null> {
     const { fen, elo, signal } = opts;
     const clampedElo = Math.max(1320, Math.min(3190, Math.round(elo)));
-    // Map ELO → Skill Level (0..20) AND movetime. Both stack for a realistic feel.
-    // Skill alone has steep "blunder" probability; combining with UCI_Elo + short movetime gives
-    // a more human-like result.
-    const skill = Math.round(((clampedElo - 1320) / (3190 - 1320)) * 20);
+    // Only UCI_Elo limits strength — Skill Level stays at 20 (max).
+    // Stacking Skill Level + UCI_Elo causes double-weakening: random blunders
+    // on top of ELO-based errors, making play incoherent at lower ELOs.
     const movetime =
-      clampedElo < 1500 ? 200 :
-      clampedElo < 1700 ? 350 :
-      clampedElo < 1900 ? 550 :
-      clampedElo < 2100 ? 800 :
-      clampedElo < 2300 ? 1100 :
-      clampedElo < 2500 ? 1500 :
-      clampedElo < 2800 ? 2000 :
-      2800;
+      clampedElo < 1500 ? 300 :
+      clampedElo < 1700 ? 500 :
+      clampedElo < 1900 ? 700 :
+      clampedElo < 2100 ? 1000 :
+      clampedElo < 2300 ? 1400 :
+      clampedElo < 2500 ? 1800 :
+      clampedElo < 2800 ? 2500 :
+      3000;
 
     let bestmove: string | null = null;
     const onLine = (line: string) => {
@@ -195,10 +197,9 @@ export class StockfishEngine {
     try {
       this.send('ucinewgame');
       this.send('setoption name MultiPV value 1');
-      this.send(`setoption name Skill Level value ${skill}`);
+      this.send('setoption name Skill Level value 20');
       this.send('setoption name UCI_LimitStrength value true');
       this.send(`setoption name UCI_Elo value ${clampedElo}`);
-      // Force a readyok before issuing position/go so the engine is in a clean state.
       await this.waitFor('readyok', () => this.send('isready'));
       this.send(`position fen ${fen}`);
       await this.waitFor('bestmove', () => this.send(`go movetime ${movetime}`), signal);
@@ -255,31 +256,28 @@ function parseInfo(line: string): AnalysisLine | null {
 
 /* ---------- pool ---------- */
 
-// Single shared engine — one WASM worker, all ops queue through it.
-// Two concurrent workers loading the same WASM can race on init; one silently hangs.
-let engineSingleton: StockfishEngine | null = null;
+// Two separate workers: one for analysis/hints, one for opponent play.
+// Sharing a single worker means hint analysis (depth=17, ~3-4s each) queues
+// BEFORE the opponent's play call, so the opponent waits 10s then gets 300ms — braindead.
+let analyzerSingleton: StockfishEngine | null = null;
+let opponentSingleton: StockfishEngine | null = null;
 
 function pickWorkerUrl(): string {
-  // Lite-single: 7 MB, no CORS headers required, reliable everywhere.
   return '/sf/stockfish-18-lite-single.js';
 }
 
 function pickThreads(): number {
-  // Single-thread WASM build — Threads option is ignored by the engine.
   return 1;
 }
 
-function getEngine(): StockfishEngine {
-  if (!engineSingleton) engineSingleton = new StockfishEngine(pickWorkerUrl());
-  return engineSingleton;
-}
-
 export function getAnalyzer(): StockfishEngine {
-  return getEngine();
+  if (!analyzerSingleton) analyzerSingleton = new StockfishEngine(pickWorkerUrl());
+  return analyzerSingleton;
 }
 
 export function getOpponent(): StockfishEngine {
-  return getEngine();
+  if (!opponentSingleton) opponentSingleton = new StockfishEngine(pickWorkerUrl());
+  return opponentSingleton;
 }
 
 /**
@@ -292,7 +290,11 @@ export async function warmEngines(): Promise<void> {
   warmed = true;
   const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   try {
-    await getEngine().analyze({ fen: startFen, depth: 1, multipv: 1 });
+    // Warm both workers in parallel — each pays WASM compile cost once
+    await Promise.all([
+      getAnalyzer().analyze({ fen: startFen, depth: 1, multipv: 1 }),
+      getOpponent().analyze({ fen: startFen, depth: 1, multipv: 1 }),
+    ]);
   } catch {
     warmed = false;
   }

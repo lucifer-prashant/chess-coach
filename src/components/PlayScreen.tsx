@@ -69,8 +69,6 @@ export default function PlayScreen() {
   const setSettings = useGame((s) => s.setSettings);
 
   useEffect(() => {
-    // Cold-start warmup: spawn engines + JIT-compile WASM with a depth-1 search
-    // so the user's first real move/hint doesn't pay the compile cost.
     warmEngines();
   }, []);
 
@@ -209,17 +207,19 @@ export default function PlayScreen() {
       if (toMove !== settings.userColor) return;
     }
     if (!settings.hintMode) { setHint(null); return; }
-    let cancelled = false;
+    const ac = new AbortController();
     const fenSnap = useExplore ? exploreFen : fen;
+    // Cap hint depth at 14 — full depth blocks the analyzer queue for too long
+    const hintDepth = Math.min(settings.depth, 14);
     getAnalyzer()
-      .analyze({ fen: fenSnap, depth: settings.depth, multipv: 3 })
+      .analyze({ fen: fenSnap, depth: hintDepth, multipv: 3, signal: ac.signal })
       .then((r) => {
         const cur = useGame.getState();
         const curFen = cur.exploreActive ? cur.exploreFen : cur.fen;
-        if (!cancelled && curFen === fenSnap) setHint(r.lines);
+        if (!ac.signal.aborted && curFen === fenSnap) setHint(r.lines);
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => { ac.abort(); };
   }, [started, status, toMove, fen, exploreActive, exploreFen, settings.userColor, settings.hintMode, settings.depth, setHint]);
 
   useEffect(() => {
@@ -432,6 +432,8 @@ export default function PlayScreen() {
     }
   }, [settings, attachAnalysisToLastMove, applyMove, streamExplanation]);
 
+  const [mobileTab, setMobileTab] = useState<'moves' | 'coach' | 'eval'>('moves');
+
   const userIsWhite = settings.userColor === 'w';
   const baseOrient = userIsWhite ? 'white' as const : 'black' as const;
   const orientation = settings.boardFlipped
@@ -457,6 +459,31 @@ export default function PlayScreen() {
     }
   };
 
+  const controlBarProps = {
+    hintOn: settings.hintMode,
+    onHint: handleToggleHint,
+    canUndo: history.length > 0 && status === 'playing' && !exploreActive,
+    onUndo: undo,
+    canResign: status === 'playing' && !exploreActive,
+    onResign: handleResign,
+    exploreActive,
+    onExplore: () => { startExplore(); toast.push('Explore mode — branch freely', 'info'); },
+    onExploreReset: resetExplore,
+    onExploreExit: exitExplore,
+    viewIndex,
+    historyLength: history.length,
+    onPrev: () => setViewIndex(Math.max(0, (viewIndex ?? history.length) - 1)),
+    onNext: () => {
+      if (viewIndex === null) return;
+      const next = viewIndex + 1;
+      setViewIndex(next >= history.length ? null : next);
+    },
+    onFirst: () => { if (history.length > 0) setViewIndex(0); },
+    onLive: () => setViewIndex(null),
+    onNewGame: handleStart,
+    gameEnded: status === 'ended',
+  };
+
   return (
     <>
       <TopNav extra={
@@ -467,7 +494,7 @@ export default function PlayScreen() {
         )
       } />
       <KeyboardHelp />
-      <main className="mx-auto max-w-[1500px] px-4 py-4 lg:px-6">
+      <main className="mx-auto max-w-[1500px] px-3 py-3 lg:px-6 lg:py-4">
 
         {!started && (
           <div className="mx-auto mt-12 max-w-md">
@@ -485,72 +512,87 @@ export default function PlayScreen() {
               <div className="mt-4 flex justify-center gap-3 text-xs text-muted">
                 <Link href="/settings" className="hover:text-text underline">change settings</Link>
                 <span>·</span>
-                <span>press <kbd>?</kbd> for shortcuts</span>
+                <span className="hidden sm:inline">press <kbd>?</kbd> for shortcuts</span>
               </div>
             </div>
           </div>
         )}
 
         {started && (
-          <div className="grid gap-4 lg:grid-cols-[44px_minmax(0,1fr)_360px]">
-            {/* Eval bar */}
+          /* Single grid — one Board instance (duplicate instances break SVG marker IDs for arrows) */
+          <div className="grid gap-3 lg:gap-4 lg:grid-cols-[44px_minmax(0,1fr)_360px]">
+
+            {/* Eval bar — desktop only */}
             <div className="hidden lg:block">
               <div style={{ height: '640px', maxHeight: '85vh' }}>
                 <EvalBar score={currentScore} whiteToMove={currentWhiteToMove} orientation={orientation} />
               </div>
             </div>
 
-            {/* Center: board + controls */}
-            <div className="mx-auto flex w-full max-w-[640px] flex-col gap-3">
-              <div className="flex items-center justify-between gap-2">
-                <OpeningBadge />
-                <div className="flex items-center gap-2">
-                  <button onClick={handleFlip} className="btn btn-sm btn-ghost" title="Flip board (F)">⇅ Flip</button>
-                  <button onClick={copyPgn} disabled={history.length === 0} className="btn btn-sm btn-ghost" title="Copy PGN">📋 PGN</button>
+            {/* Center column — board + all controls */}
+            <div className="mx-auto flex w-full max-w-[640px] flex-col gap-2 lg:gap-3">
+
+              {/* Top strip — fixed height so OpeningBadge appearing doesn't shift board */}
+              <div className="flex h-9 items-center justify-between gap-2 overflow-hidden">
+                <div className="min-w-0 flex-1 overflow-hidden">
+                  <OpeningBadge />
+                </div>
+                <div className="flex flex-none items-center gap-1 lg:gap-2">
+                  <button onClick={handleFlip} className="btn btn-sm btn-ghost px-2 lg:px-3" title="Flip board (F)">
+                    <span className="hidden lg:inline">⇅ Flip</span>
+                    <span className="lg:hidden">⇅</span>
+                  </button>
+                  <button onClick={copyPgn} disabled={history.length === 0} className="btn btn-sm btn-ghost px-2 lg:px-3" title="Copy PGN">
+                    <span className="hidden lg:inline">📋 PGN</span>
+                    <span className="lg:hidden">📋</span>
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
+
+              {/* Opponent row — fixed height so captures/thinking appearing don't shift board */}
+              <div className="flex h-9 items-center justify-between">
                 <PlayerTag side={topSide} role={topSide === (userIsWhite ? 'black' : 'white') ? 'opponent' : 'you'} elo={settings.elo} thinking={thinking} />
                 <Clock side={topSide} />
               </div>
 
+              {/* Board — single instance shared by mobile + desktop */}
               <Board hintLines={pendingHint} onMove={(f, t) => onUserMove(f, t)} />
 
-              <div className="flex items-center justify-between">
+              {/* Player row — fixed height */}
+              <div className="flex h-9 items-center justify-between">
                 <PlayerTag side={bottomSide} role={bottomSide === (userIsWhite ? 'white' : 'black') ? 'you' : 'opponent'} elo={settings.elo} thinking={thinking} />
                 <Clock side={bottomSide} />
               </div>
 
               <GameStatusBanner />
+              <ControlBar {...controlBarProps} />
 
-              <ControlBar
-                hintOn={settings.hintMode}
-                onHint={handleToggleHint}
-                canUndo={history.length > 0 && status === 'playing' && !exploreActive}
-                onUndo={undo}
-                canResign={status === 'playing' && !exploreActive}
-                onResign={handleResign}
-                exploreActive={exploreActive}
-                onExplore={() => { startExplore(); toast.push('Explore mode — branch freely', 'info'); }}
-                onExploreReset={resetExplore}
-                onExploreExit={exitExplore}
-                viewIndex={viewIndex}
-                historyLength={history.length}
-                onPrev={() => setViewIndex(Math.max(0, (viewIndex ?? history.length) - 1))}
-                onNext={() => {
-                  if (viewIndex === null) return;
-                  const next = viewIndex + 1;
-                  setViewIndex(next >= history.length ? null : next);
-                }}
-                onFirst={() => { if (history.length > 0) setViewIndex(0); }}
-                onLive={() => setViewIndex(null)}
-                onNewGame={handleStart}
-                gameEnded={status === 'ended'}
-              />
+              {/* Mobile panel — tabs below controls, hidden on desktop */}
+              <div className="lg:hidden mt-1 flex flex-col gap-2">
+                <div className="flex overflow-hidden rounded-xl border border-border">
+                  {(['moves', 'coach', 'eval'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setMobileTab(tab)}
+                      className={
+                        'flex-1 py-2.5 text-xs font-semibold uppercase tracking-wide transition ' +
+                        (mobileTab === tab ? 'bg-accent/20 text-accent' : 'text-muted hover:text-text hover:bg-white/5')
+                      }
+                    >
+                      {tab === 'moves' ? 'Moves' : tab === 'coach' ? 'Coach' : 'Analysis'}
+                    </button>
+                  ))}
+                </div>
+                <div className="min-h-[220px]">
+                  {mobileTab === 'moves' && <MoveHistory maxHeight="320px" />}
+                  {mobileTab === 'coach' && <CoachPanel />}
+                  {mobileTab === 'eval' && <EvalGraph />}
+                </div>
+              </div>
             </div>
 
-            {/* Right: moves big, coach collapsible, eval graph */}
-            <div className="flex min-h-[640px] flex-col gap-3">
+            {/* Right sidebar — desktop only */}
+            <div className="hidden lg:flex min-h-[640px] flex-col gap-3">
               <MoveHistory maxHeight="540px" />
               <CoachPanel />
               <EvalGraph />
@@ -588,61 +630,42 @@ interface ControlBarProps {
 
 function ControlBar(p: ControlBarProps) {
   const reviewing = p.viewIndex !== null;
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {!p.exploreActive ? (
-        <>
-          <button
-            onClick={p.onHint}
-            title="Toggle hint (H)"
-            className={'btn btn-sm ' + (p.hintOn ? '!border-good/50 !bg-good/10 !text-good' : '')}
-          >
-            {p.hintOn ? '💡 Hint on' : '💡 Hint'}
-          </button>
-          <button onClick={p.onUndo} disabled={!p.canUndo} className="btn btn-sm" title="Undo (U)">
-            ↶ Undo
-          </button>
-          <button onClick={p.onResign} disabled={!p.canResign} className="btn btn-sm" title="Resign (R)">
-            🏳 Resign
-          </button>
-          <button onClick={p.onExplore} className="btn btn-sm" title="Explore (E)">
-            ⚐ Explore
-          </button>
-        </>
-      ) : (
-        <>
-          <button onClick={p.onExploreReset} className="btn btn-sm">↺ Reset branch</button>
-          <button onClick={p.onExploreExit} className="btn btn-sm btn-primary">Exit explore</button>
-        </>
-      )}
+  const navRow = (
+    <div className="flex items-center gap-1.5">
+      <button onClick={p.onFirst} disabled={p.historyLength === 0 || p.viewIndex === 0} className="btn btn-icon btn-sm" title="First (Home)">⇤</button>
+      <button onClick={p.onPrev} disabled={p.historyLength === 0 || (reviewing && p.viewIndex === 0)} className="btn btn-icon btn-sm" title="Prev (←)">←</button>
+      <button onClick={p.onNext} disabled={!reviewing} className="btn btn-icon btn-sm" title="Next (→)">→</button>
+      {reviewing
+        ? <button onClick={p.onLive} className="btn btn-sm btn-primary" title="Live (End)">Live ⇥</button>
+        : <button onClick={p.onNewGame} className="btn btn-sm btn-primary" title="New game (N)">+ New</button>
+      }
+    </div>
+  );
 
-      <div className="ml-auto flex items-center gap-1.5">
-        <button
-          onClick={p.onFirst}
-          disabled={p.historyLength === 0 || p.viewIndex === 0}
-          className="btn btn-icon btn-sm"
-          title="First (Home)"
-        >⇤</button>
-        <button
-          onClick={p.onPrev}
-          disabled={p.historyLength === 0 || (reviewing && p.viewIndex === 0)}
-          className="btn btn-icon btn-sm"
-          title="Prev (←)"
-        >←</button>
-        <button
-          onClick={p.onNext}
-          disabled={!reviewing}
-          className="btn btn-icon btn-sm"
-          title="Next (→)"
-        >→</button>
-        {reviewing ? (
-          <button onClick={p.onLive} className="btn btn-sm btn-primary" title="Live (End)">Live ⇥</button>
+  return (
+    <div className="flex flex-col gap-2">
+      {/* Row 1: actions */}
+      <div className="flex flex-wrap items-center gap-2">
+        {!p.exploreActive ? (
+          <>
+            <button onClick={p.onHint} title="Toggle hint (H)" className={'btn btn-sm ' + (p.hintOn ? '!border-good/50 !bg-good/10 !text-good' : '')}>
+              {p.hintOn ? '💡 On' : '💡 Hint'}
+            </button>
+            <button onClick={p.onUndo} disabled={!p.canUndo} className="btn btn-sm" title="Undo (U)">↶ Undo</button>
+            <button onClick={p.onResign} disabled={!p.canResign} className="btn btn-sm" title="Resign (R)">🏳 Resign</button>
+            <button onClick={p.onExplore} className="btn btn-sm" title="Explore (E)">⚐ Explore</button>
+          </>
         ) : (
-          <button onClick={p.onNewGame} className="btn btn-sm btn-primary" title="New game (N)">
-            + New
-          </button>
+          <>
+            <button onClick={p.onExploreReset} className="btn btn-sm">↺ Reset</button>
+            <button onClick={p.onExploreExit} className="btn btn-sm btn-primary">Exit explore</button>
+          </>
         )}
+        {/* Nav inline on desktop, own row on mobile */}
+        <div className="ml-auto hidden sm:flex">{navRow}</div>
       </div>
+      {/* Row 2: nav — mobile only */}
+      <div className="flex sm:hidden">{navRow}</div>
     </div>
   );
 }

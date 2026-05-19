@@ -107,8 +107,8 @@ export default function SettingsPage() {
   return (
     <>
       <TopNav />
-      <main className="mx-auto max-w-3xl px-6 py-8">
-        <header className="mb-8 flex items-end justify-between gap-4">
+      <main className="mx-auto max-w-3xl px-3 py-6 sm:px-6 sm:py-8">
+        <header className="mb-6 flex items-end justify-between gap-4 sm:mb-8">
           <div>
             <h1 className="text-3xl font-bold">Settings</h1>
             <p className="mt-1 text-sm text-muted">Stored locally in your browser.</p>
@@ -321,7 +321,7 @@ export default function SettingsPage() {
 
 function Section({ title, icon, right, children }: { title: string; icon?: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="card mb-5 p-6">
+    <section className="card mb-4 p-4 sm:mb-5 sm:p-6">
       <header className="mb-4 flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted">
           {icon && <span className="text-base">{icon}</span>}

@@ -14,6 +14,7 @@ export default function MoveHistory({ maxHeight }: { maxHeight?: string }) {
   const userColor = useGame((s) => s.settings.userColor);
   const [filter, setFilter] = useState<'all' | 'bad' | 'mine'>('all');
   const listRef = useRef<HTMLOListElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const pairs = useMemo(() => {
     const arr: Array<{ n: number; white?: typeof history[number]; black?: typeof history[number] }> = [];
@@ -23,13 +24,24 @@ export default function MoveHistory({ maxHeight }: { maxHeight?: string }) {
     return arr;
   }, [history]);
 
-  // Auto-scroll to active.
+  // Auto-scroll to active — scroll only within the inner container, never the window.
   useEffect(() => {
-    if (!listRef.current) return;
+    const container = scrollContainerRef.current;
+    const list = listRef.current;
+    if (!container || !list) return;
     const idx = viewIndex ?? history.length - 1;
     if (idx < 0) return;
-    const el = listRef.current.querySelector<HTMLElement>(`[data-ply="${idx}"]`);
-    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const el = list.querySelector<HTMLElement>(`[data-ply="${idx}"]`);
+    if (!el) return;
+    const elTop = el.offsetTop;
+    const elBottom = elTop + el.offsetHeight;
+    const cTop = container.scrollTop;
+    const cBottom = cTop + container.clientHeight;
+    if (elTop < cTop) {
+      container.scrollTop = elTop - 8;
+    } else if (elBottom > cBottom) {
+      container.scrollTop = elBottom - container.clientHeight + 8;
+    }
   }, [viewIndex, history.length]);
 
   const blunderIdxs = useMemo(
@@ -80,7 +92,7 @@ export default function MoveHistory({ maxHeight }: { maxHeight?: string }) {
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-2">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-2">
         {pairs.length === 0 && <div className="px-2 py-4 text-sm text-muted">No moves yet.</div>}
         <ol ref={listRef} className="space-y-0.5 font-mono text-sm">
           {pairs.map((p) => {

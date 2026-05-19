@@ -13,15 +13,20 @@ export default function GameSummary({ onJump }: { onJump: (ply: number) => void 
   const settings = useGame((s) => s.settings);
   const endReason = useGame((s) => s.endReason);
   const endResult = useGame((s) => s.endResult);
-  const [open, setOpen] = useState(true);
+  const reviewMode = useGame((s) => s.reviewMode);
+  const [open, setOpen] = useState(!reviewMode);
   const toast = useToast();
 
-  const a = useMemo(() => analyzeGame(history, settings.userColor), [history, settings.userColor]);
+  // Only compute when game is ended — analyzeGame is O(n) and runs on every move otherwise
+  const a = useMemo(
+    () => status === 'ended' ? analyzeGame(history, settings.userColor) : null,
+    [status, history, settings.userColor],
+  );
 
   if (status !== 'ended') return null;
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="btn btn-sm fixed bottom-4 right-4 z-40 shadow-xl">
+      <button onClick={() => setOpen(true)} className="btn btn-sm fixed bottom-20 right-3 z-40 shadow-xl sm:bottom-4 sm:right-4">
         📊 Summary
       </button>
     );
@@ -48,7 +53,7 @@ export default function GameSummary({ onJump }: { onJump: (ply: number) => void 
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
       onClick={() => setOpen(false)}
     >
-      <div className="card pop max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="card pop max-h-[90vh] w-full max-w-lg overflow-y-auto p-4 sm:p-6" onClick={(e) => e.stopPropagation()}>
         <header className="mb-4 flex items-start justify-between">
           <div>
             <div className={'text-2xl font-bold ' + verdictCls}>{verdict}</div>
@@ -59,8 +64,8 @@ export default function GameSummary({ onJump }: { onJump: (ply: number) => void 
 
         {/* Accuracy */}
         <div className="mb-5 grid grid-cols-2 gap-3">
-          <AccuracyCard label="Your accuracy" value={a.userAccuracy} />
-          <AccuracyCard label="Stockfish accuracy" value={a.oppAccuracy} />
+          <AccuracyCard label="Your accuracy" value={a!.userAccuracy} />
+          <AccuracyCard label="Stockfish accuracy" value={a!.oppAccuracy} />
         </div>
 
         {/* Move breakdown */}
@@ -68,7 +73,7 @@ export default function GameSummary({ onJump }: { onJump: (ply: number) => void 
           <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">Your moves</div>
           <div className="flex flex-wrap gap-2">
             {(['best', 'great', 'good', 'decent', 'inaccuracy', 'mistake', 'blunder'] as const).map((l) => {
-              const n = a.counts[l] ?? 0;
+              const n = a!.counts[l] ?? 0;
               if (n === 0) return null;
               return (
                 <span
@@ -88,17 +93,17 @@ export default function GameSummary({ onJump }: { onJump: (ply: number) => void 
         </div>
 
         {/* Worst move */}
-        {a.worst && (
+        {a!.worst && (
           <div className="mb-3 rounded-lg border border-bad/30 bg-bad/5 p-3">
             <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-bad">Biggest mistake</div>
             <div className="mt-1 flex items-center justify-between">
               <div>
-                <span className="font-mono text-lg">{a.worst.san}</span>
+                <span className="font-mono text-lg">{a!.worst!.san}</span>
                 <span className="ml-2 text-xs text-muted">
-                  move {a.worst.ply} · −{(a.worst.classification!.cpLoss / 100).toFixed(2)}
+                  move {a!.worst!.ply} · −{(a!.worst!.classification!.cpLoss / 100).toFixed(2)}
                 </span>
               </div>
-              <button onClick={() => { onJump(a.worst!.ply - 1); setOpen(false); }} className="btn btn-sm">
+              <button onClick={() => { onJump(a!.worst!.ply - 1); setOpen(false); }} className="btn btn-sm">
                 Jump →
               </button>
             </div>
@@ -106,15 +111,15 @@ export default function GameSummary({ onJump }: { onJump: (ply: number) => void 
         )}
 
         {/* Best move */}
-        {a.best && (
+        {a!.best && (
           <div className="mb-3 rounded-lg border border-good/30 bg-good/5 p-3">
             <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-good">Best move</div>
             <div className="mt-1 flex items-center justify-between">
               <div>
-                <span className="font-mono text-lg">{a.best.san}</span>
-                <span className="ml-2 text-xs text-muted">move {a.best.ply}</span>
+                <span className="font-mono text-lg">{a!.best!.san}</span>
+                <span className="ml-2 text-xs text-muted">move {a!.best!.ply}</span>
               </div>
-              <button onClick={() => { onJump(a.best!.ply - 1); setOpen(false); }} className="btn btn-sm">
+              <button onClick={() => { onJump(a!.best!.ply - 1); setOpen(false); }} className="btn btn-sm">
                 Jump →
               </button>
             </div>
@@ -122,13 +127,13 @@ export default function GameSummary({ onJump }: { onJump: (ply: number) => void 
         )}
 
         {/* Blunders list */}
-        {a.blunders.length > 0 && (
+        {a!.blunders.length > 0 && (
           <div className="mb-4">
             <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">
-              Blunders ({a.blunders.length})
+              Blunders ({a!.blunders.length})
             </div>
             <ul className="space-y-1">
-              {a.blunders.slice(0, 6).map((b) => (
+              {a!.blunders.slice(0, 6).map((b) => (
                 <li
                   key={b.ply}
                   onClick={() => { onJump(b.ply - 1); setOpen(false); }}
@@ -148,7 +153,7 @@ export default function GameSummary({ onJump }: { onJump: (ply: number) => void 
 
         <div className="flex gap-2 border-t border-border pt-4">
           <button onClick={copyPgn} className="btn btn-sm flex-1">📋 Copy PGN</button>
-          <button onClick={() => setOpen(false)} className="btn btn-sm flex-1">Review game</button>
+          <button onClick={() => setOpen(false)} className="btn btn-sm btn-primary flex-1">Analyze →</button>
         </div>
       </div>
     </div>

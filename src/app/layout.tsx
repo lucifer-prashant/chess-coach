@@ -8,6 +8,12 @@ export const metadata: Metadata = {
   description: 'Local Stockfish-powered chess coach. Play and learn.',
 };
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>

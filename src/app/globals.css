@@ -13,6 +13,7 @@ html, body {
     #0b0d12;
   color: #e6e8ef;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overscroll-behavior: none;
 }
 
 /* ----------- Chessground sizing ------------ */
@@ -41,6 +42,9 @@ html, body {
 
 /* ----------- Misc UI ------------ */
 * { -webkit-tap-highlight-color: transparent; }
+
+/* Faster touch response — no 300ms delay */
+button, a, [role="button"] { touch-action: manipulation; }
 
 .glass {
   background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));

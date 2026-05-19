@@ -16,9 +16,10 @@ import GameStatusBanner from './GameStatusBanner';
 import Captures from './Captures';
 import OpeningBadge from './OpeningBadge';
 import GameSummary from './GameSummary';
+import EngineLines from './EngineLines';
 import { useToast } from './Toast';
 import { useGame } from '@/lib/store';
-import { getAnalyzer, getOpponent, warmEngines, type Score } from '@/lib/engine';
+import { getAnalyzer, getOpponent, warmEngines, getPlayDepthForElo, type Score } from '@/lib/engine';
 import { classify, scoreToCp } from '@/lib/classify';
 import { detectFlags, detectPhase } from '@/lib/detectors';
 import { explainMove, type ExplainInput } from '@/lib/nim';
@@ -205,11 +206,11 @@ export default function PlayScreen() {
     if (!useExplore) {
       if (status !== 'playing') return;
       if (toMove !== settings.userColor) return;
+      // In normal play, gate on hintMode; in explore always analyze for analysis board
+      if (!settings.hintMode) { setHint(null); return; }
     }
-    if (!settings.hintMode) { setHint(null); return; }
     const ac = new AbortController();
     const fenSnap = useExplore ? exploreFen : fen;
-    // Cap hint depth at 14 — full depth blocks the analyzer queue for too long
     const hintDepth = Math.min(settings.depth, 14);
     getAnalyzer()
       .analyze({ fen: fenSnap, depth: hintDepth, multipv: 3, signal: ac.signal })
@@ -408,7 +409,10 @@ export default function PlayScreen() {
       }
       const fenAfterOpp = useGame.getState().fen;
       const oppMoverIsWhite = !moverWasWhite;
-      analyzer.analyze({ fen: fenAfterOpp, depth: settings.depth, multipv: 1 })
+      // Analyze at opponent's play depth, not settings depth — prevents
+      // d20 analysis making d13 moves look artificially bad (accuracy bias)
+      const oppAnalysisDepth = Math.min(settings.depth, getPlayDepthForElo(settings.elo) + 2);
+      analyzer.analyze({ fen: fenAfterOpp, depth: oppAnalysisDepth, multipv: 1 })
         .then((r) => {
           if (r.lines[0] && useGame.getState().fen === fenAfterOpp) {
             setCurrentScore(r.lines[0].score);
@@ -585,7 +589,11 @@ export default function PlayScreen() {
                 </div>
                 <div className="min-h-[220px]">
                   {mobileTab === 'moves' && <MoveHistory maxHeight="320px" />}
-                  {mobileTab === 'coach' && <CoachPanel />}
+                  {mobileTab === 'coach' && (
+                    exploreActive
+                      ? <EngineLines lines={pendingHint} fen={exploreFen} />
+                      : <CoachPanel />
+                  )}
                   {mobileTab === 'eval' && <EvalGraph />}
                 </div>
               </div>
@@ -593,8 +601,11 @@ export default function PlayScreen() {
 
             {/* Right sidebar — desktop only */}
             <div className="hidden lg:flex min-h-[640px] flex-col gap-3">
-              <MoveHistory maxHeight="540px" />
-              <CoachPanel />
+              <MoveHistory maxHeight="380px" />
+              {exploreActive
+                ? <EngineLines lines={pendingHint} fen={exploreFen} />
+                : <CoachPanel />
+              }
               <EvalGraph />
             </div>
           </div>

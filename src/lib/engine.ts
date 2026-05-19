@@ -267,6 +267,11 @@ function eloToSkillDepth(elo: number): { skill: number; depth: number; movetime:
   return               { skill: 20, depth: 15, movetime: 5000 };
 }
 
+/** Returns the search depth used for a given ELO — for fair accuracy comparison. */
+export function getPlayDepthForElo(elo: number): number {
+  return eloToSkillDepth(Math.max(1320, Math.min(3190, Math.round(elo)))).depth;
+}
+
 /* ---------- pool ---------- */
 
 // Two separate workers: one for analysis/hints, one for opponent play.
